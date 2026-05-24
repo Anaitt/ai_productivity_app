@@ -61,11 +61,22 @@ PALETTE = {
 # =============================================================================
 @st.cache_data
 def load_and_process_data():
+    # Берём credentials из Streamlit Secrets (в облаке)
+    # или из переменных окружения (локально)
+    os.environ["KAGGLE_USERNAME"] = st.secrets.get(
+        "KAGGLE_USERNAME",
+        os.getenv("KAGGLE_USERNAME", "")
+    )
+    os.environ["KAGGLE_KEY"] = st.secrets.get(
+        "KAGGLE_KEY",
+        os.getenv("KAGGLE_KEY", "")
+    )
+
     folder_path = kagglehub.dataset_download(
         'vishardmehta/ai-tool-usage-and-workplace-productivity-dataset'
     )
+    
     csv_files = [f for f in os.listdir(folder_path) if f.endswith('.csv')]
-
     if len(csv_files) < 2:
         st.error("Ошибка: Недостаточно CSV-файлов в датасете.")
         return None
@@ -81,7 +92,6 @@ def load_and_process_data():
         .fillna(0)
     )
 
-    # KMeans кластеризация по всему датасету
     cluster_features = [
         'tasks_automated_percent', 'ai_ratio',
         'work_life_balance_score', 'error_rate_percent',
@@ -90,12 +100,11 @@ def load_and_process_data():
     ]
     scaler_km = StandardScaler()
     X_km = scaler_km.fit_transform(df[cluster_features].fillna(0))
-    km = KMeans(n_clusters=4, random_state=42, n_init=10)
+    km   = KMeans(n_clusters=4, random_state=42, n_init=10)
     df['cluster'] = km.fit_predict(X_km)
 
-    # Переименование кластеров по логике центроидов
     centers = pd.DataFrame(km.cluster_centers_, columns=cluster_features)
-    order = (
+    order   = (
         centers['tasks_automated_percent']
         .rank(ascending=False)
         .astype(int) - 1
